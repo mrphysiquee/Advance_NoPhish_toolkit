@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Links - Panel{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>Links{% if campaign %} - {{ campaign.name }}{% endif %}</h1>
+</div>
+
+<div class="table-wrap">
+    <table>
+        <thead>
+            <tr>
+                <th>Campaign</th>
+                <th>User</th>
+                <th>URL</th>
+                <th>Clicks</th>
+                <th>Created</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for link in links %}
+            <tr>
+                <td>{{ link.campaign.name if link.campaign else 'N/A' }}</td>
+                <td>User {{ link.user_num }}</td>
+                <td class="truncate"><code id="link-{{ link.id }}">{{ link.url }}</code></td>
+                <td>{{ link.click_count }}</td>
+                <td>{{ link.created_at.strftime('%Y-%m-%d %H:%M') if link.created_at else '' }}</td>
+                <td class="actions">
+                    <button class="btn btn-sm" onclick="copyLink('link-{{ link.id }}')">Copy</button>
+                    <form method="POST" action="{{ url_for('links.regenerate', link_id=link.id) }}" style="display:inline">
+                        <button type="submit" class="btn btn-sm">Regenerate</button>
+                    </form>
+                </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="6" class="empty-state">No links generated yet.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/clipboard.js') }}"></script>
+{% endblock %}

@@ -821,7 +821,7 @@ html {
   right: 0;
 
   color: white;
-  background: rgba(0, 0, 0, 0.5);
+  background: #fff;
   z-index: 50;
 
   /*display: flex;*/
@@ -845,16 +845,30 @@ html {
 
 /* Main container */
 #noVNC_container {
-  width: 100%;
-  height: 100%;
-  border-bottom-right-radius: 800px 600px;
-  /*border-top-left-radius: 800px 600px;*/
+  width: 100vw;
+  height: 100vh;
+  margin: 0;
+  padding: 0;
 
   /* If selection isn't disabled, long-pressing stuff in the sidebar
      can accidentally select the container or the canvas. This can
      happen when attempting to move the handle. */
   user-select: none;
   -webkit-user-select: none;
+}
+
+/* Hide all noVNC UI chrome */
+#noVNC_status {
+  display: none !important;
+}
+#noVNC_transition_text {
+  display: none !important;
+}
+.noVNC_spinner {
+  display: none !important;
+}
+#noVNC_control_bar_anchor {
+  display: none !important;
 }
 
 #noVNC_keyboardinput {
@@ -891,6 +905,137 @@ html {
 
 #noVNC_bell {
   display: none;
+}
+
+/* Mobile-specific enhancements */
+@media (max-width: 768px) {
+    /* Larger touch targets on mobile */
+    .noVNC_button {
+        min-height: 48px;
+        min-width: 48px;
+        padding: 12px;
+    }
+    
+    /* Hide control bar by default on mobile */
+    #noVNC_control_bar_anchor {
+        opacity: 0;
+        transition: opacity 0.3s ease;
+    }
+    #noVNC_control_bar_anchor.noVNC_open {
+        opacity: 1;
+    }
+    
+    /* Full screen canvas on mobile */
+    #noVNC_canvas {
+        width: 100vw !important;
+        height: 100vh !important;
+        object-fit: contain;
+    }
+    
+    /* Mobile keyboard button always visible */
+    #noVNC_mobile_buttons {
+        display: block !important;
+    }
+    
+    /* Hide desktop-only buttons on mobile */
+    #noVNC_view_drag_button {
+        display: none !important;
+    }
+    
+    /* Enhanced mobile panel styling */
+    .noVNC_panel {
+        max-width: 95vw;
+        max-height: 80vh;
+        margin: 2vh auto;
+    }
+    
+    /* Mobile keyboard input enhancement */
+    #noVNC_keyboardinput {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: white;
+        z-index: 1000;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.3s ease;
+        height: 200px;
+    }
+    
+    #noVNC_keyboardinput:focus {
+        opacity: 1;
+        pointer-events: auto;
+    }
+    
+    /* Prevent zoom on mobile */
+    input, textarea, select, button {
+        font-size: 16px !important;
+        -webkit-text-size-adjust: 100%;
+        -moz-text-size-adjust: 100%;
+        text-size-adjust: 100%;
+    }
+    
+    /* Hide scrollbars on mobile */
+    ::-webkit-scrollbar {
+        display: none;
+        width: 0;
+        height: 0;
+    }
+}
+
+/* iOS-specific fixes */
+@media (device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2) {
+    /* iPhone 6/7/8 */
+    #noVNC_canvas {
+        width: 375px !important;
+        height: 667px !important;
+    }
+}
+
+@media (device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3) {
+    /* iPhone X/11 */
+    #noVNC_canvas {
+        width: 375px !important;
+        height: 812px !important;
+    }
+}
+
+@media (device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 2) {
+    /* iPhone XR/11 */
+    #noVNC_canvas {
+        width: 414px !important;
+        height: 896px !important;
+    }
+}
+
+/* Android-specific fixes */
+@media (max-width: 412px) and (max-height: 915px) {
+    #noVNC_canvas {
+        width: 412px !important;
+        height: 915px !important;
+    }
+}
+
+/* Ensure canvas takes full viewport */
+#noVNC_canvas {
+    width: 100vw !important;
+    height: 100vh !important;
+    object-fit: contain;
+    touch-action: none;
+}
+
+/* Hide address bar on mobile */
+@media (max-width: 768px) {
+    html {
+        overflow: hidden;
+    }
+    body {
+        overflow: hidden;
+        position: fixed;
+        width: 100%;
+        height: 100%;
+    }
 }
 
 /* ----------------------------------------

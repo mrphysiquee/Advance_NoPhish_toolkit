@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Add Domain - Panel{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>Add Domain</h1>
+</div>
+
+<div class="form-card">
+    <form method="POST">
+        <div class="form-group">
+            <label for="name">Domain Name</label>
+            <input type="text" id="name" name="name" required placeholder="e.g. phish.example.com" autofocus>
+            <small>Must have DNS A record pointing to this server</small>
+        </div>
+
+        <div class="form-group">
+            <label for="purpose">Purpose</label>
+            <select id="purpose" name="purpose">
+                <option value="campaign">Campaign (Phishing)</option>
+                <option value="panel">Admin Panel</option>
+            </select>
+            <small>Campaign domains are used for phishing links. Panel domain is for this admin interface.</small>
+        </div>
+
+        <div class="form-group">
+            <label for="cert_method">SSL Certificate Method</label>
+            <select id="cert_method" name="cert_method" onchange="toggleCertFields()">
+                <option value="letsencrypt">Let's Encrypt (Auto)</option>
+                <option value="manual">Manual (Provide Paths)</option>
+            </select>
+        </div>
+
+        <div id="manual-cert-fields" style="display:none">
+            <div class="form-group">
+                <label for="cert_path">Certificate Path (PEM/fullchain)</label>
+                <input type="text" id="cert_path" name="cert_path" placeholder="/etc/letsencrypt/live/domain/fullchain.pem">
+            </div>
+            <div class="form-group">
+                <label for="key_path">Private Key Path</label>
+                <input type="text" id="key_path" name="key_path" placeholder="/etc/letsencrypt/live/domain/privkey.pem">
+            </div>
+        </div>
+
+        <div class="form-group" style="margin-top:20px">
+            <button type="submit" class="btn btn-primary">Add Domain</button>
+            <a href="{{ url_for('domains.list_domains') }}" class="btn">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+function toggleCertFields() {
+    var method = document.getElementById('cert_method').value;
+    document.getElementById('manual-cert-fields').style.display = method === 'manual' ? 'block' : 'none';
+}
+</script>
+{% endblock %}

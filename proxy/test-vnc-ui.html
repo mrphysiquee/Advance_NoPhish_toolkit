@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VNC UI Manager Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background: #f5f5f5;
+        }
+        .test-container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .test-result {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-family: monospace;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .iframe-test {
+            margin: 20px 0;
+        }
+        iframe {
+            border: 1px solid #ccc;
+            width: 100%;
+            height: 400px;
+        }
+    </style>
+</head>
+<body>
+    <h1>VNC UI Manager Test</h1>
+    
+    <div class="test-container">
+        <h2>Screen Information</h2>
+        <div id="screen-info" class="test-result info">Loading screen information...</div>
+        
+        <h2>Device Detection</h2>
+        <div id="device-info" class="test-result info">Loading device information...</div>
+        
+        <h2>VNC UI Manager Status</h2>
+        <div id="vnc-status" class="test-result info">Checking VNC UI Manager...</div>
+        
+        <button onclick="testScreenDetection()">Test Screen Detection</button>
+        <button onclick="testDeviceDetection()">Test Device Detection</button>
+        <button onclick="testVNCManager()">Test VNC UI Manager</button>
+        <button onclick="testIframeIntegration()">Test Iframe Integration</button>
+    </div>
+    
+    <div class="test-container iframe-test">
+        <h2>Iframe Integration Test</h2>
+        <p>Test the VNC UI Manager with an iframe:</p>
+        <iframe id="test-iframe" src="data:text/html,<html><body><h1>Test Iframe</h1><p>This is a test iframe to verify VNC UI Manager integration.</p><script>console.log('Iframe loaded successfully');</script></body></html>"></iframe>
+    </div>
+    
+    <script src="vnc-ui-manager.js"></script>
+    
+    <script>
+        function testScreenDetection() {
+            const screenInfo = document.getElementById('screen-info');
+            try {
+                const screenData = {
+                    width: screen.width,
+                    height: screen.height,
+                    availWidth: screen.availWidth,
+                    availHeight: screen.availHeight,
+                    windowWidth: window.innerWidth,
+                    windowHeight: window.innerHeight,
+                    pixelRatio: window.devicePixelRatio || 1,
+                    colorDepth: screen.colorDepth,
+                    timestamp: Date.now()
+                };
+                
+                screenInfo.innerHTML = `
+                    <strong>Screen Resolution:</strong> ${screenData.width} x ${screenData.height}<br>
+                    <strong>Available Space:</strong> ${screenData.availWidth} x ${screenData.availHeight}<br>
+                    <strong>Window Size:</strong> ${screenData.windowWidth} x ${screenData.windowHeight}<br>
+                    <strong>Pixel Ratio:</strong> ${screenData.pixelRatio}<br>
+                    <strong>Color Depth:</strong> ${screenData.colorDepth}bpp<br>
+                    <strong>Timestamp:</strong> ${new Date(screenData.timestamp).toLocaleString()}
+                `;
+                screenInfo.className = 'test-result success';
+            } catch (error) {
+                screenInfo.innerHTML = `<strong>Error:</strong> ${error.message}`;
+                screenInfo.className = 'test-result error';
+            }
+        }
+        
+        function testDeviceDetection() {
+            const deviceInfo = document.getElementById('device-info');
+            try {
+                const isMobile = /iPhone|iPad|iPod|Android|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+                const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+                const isAndroid = /Android/.test(navigator.userAgent);
+                const supportsTouch = 'ontouchstart' in window;
+                const orientation = screen.orientation ? screen.orientation.type : 'unknown';
+                
+                deviceInfo.innerHTML = `
+                    <strong>Is Mobile:</strong> ${isMobile}<br>
+                    <strong>Is iOS:</strong> ${isIOS}<br>
+                    <strong>Is Android:</strong> ${isAndroid}<br>
+                    <strong>Supports Touch:</strong> ${supportsTouch}<br>
+                    <strong>Orientation:</strong> ${orientation}<br>
+                    <strong>User Agent:</strong> ${navigator.userAgent.substring(0, 100)}...
+                `;
+                deviceInfo.className = 'test-result success';
+            } catch (error) {
+                deviceInfo.innerHTML = `<strong>Error:</strong> ${error.message}`;
+                deviceInfo.className = 'test-result error';
+            }
+        }
+        
+        function testVNCManager() {
+            const vncStatus = document.getElementById('vnc-status');
+            try {
+                if (typeof VNCUIManager !== 'undefined') {
+                    vncStatus.innerHTML = '<strong>VNC UI Manager Class:</strong> Available<br><strong>Status:</strong> Ready for initialization';
+                    vncStatus.className = 'test-result success';
+                } else {
+                    vncStatus.innerHTML = '<strong>VNC UI Manager Class:</strong> Not found<br><strong>Status:</strong> Not available';
+                    vncStatus.className = 'test-result error';
+                }
+                
+                // Test if manager is initialized
+                if (window.vncUIManager) {
+                    vncStatus.innerHTML += '<br><strong>Manager Instance:</strong> Initialized<br><strong>Screen Data:</strong> Available';
+                    vncStatus.className = 'test-result success';
+                } else {
+                    vncStatus.innerHTML += '<br><strong>Manager Instance:</strong> Not initialized<br><strong>Screen Data:</strong> Not available';
+                    vncStatus.className = 'test-result error';
+                }
+            } catch (error) {
+                vncStatus.innerHTML = `<strong>Error:</strong> ${error.message}`;
+                vncStatus.className = 'test-result error';
+            }
+        }
+        
+        function testIframeIntegration() {
+            const testIframe = document.getElementById('test-iframe');
+            try {
+                // Change iframe source to test with real VNC content
+                testIframe.src = 'data:text/html,<html><body><h1>VNC UI Manager Iframe Test</h1><p>This iframe tests VNC UI Manager integration.</p><script>console.log("Iframe VNC UI Manager test"); if (typeof VNCUIManager !== "undefined") { console.log("VNC UI Manager available in iframe"); } else { console.log("VNC UI Manager not available in iframe"); }</script></body></html>';
+                
+                setTimeout(() => {
+                    const result = document.createElement('div');
+                    result.className = 'test-result info';
+                    result.innerHTML = '<strong>Iframe Integration:</strong> Test iframe updated successfully<br><strong>Next Step:</strong> Check browser console for iframe test results';
+                    document.querySelector('.iframe-test').appendChild(result);
+                }, 1000);
+            } catch (error) {
+                const result = document.createElement('div');
+                result.className = 'test-result error';
+                result.innerHTML = `<strong>Iframe Integration Error:</strong> ${error.message}`;
+                document.querySelector('.iframe-test').appendChild(result);
+            }
+        }
+        
+        // Run initial tests
+        window.addEventListener('load', function() {
+            testScreenDetection();
+            testDeviceDetection();
+            testVNCManager();
+        });
+        
+        // Monitor VNC UI Manager initialization
+        document.addEventListener('DOMContentLoaded', function() {
+            if (window.vncUIManager) {
+                console.log('VNC UI Manager initialized successfully');
+                testVNCManager();
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Containers - {{ campaign.name }}{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>Containers - {{ campaign.name }}</h1>
+    <a href="{{ url_for('campaigns.detail', campaign_id=campaign.id) }}" class="btn">Back to Campaign</a>
+</div>
+
+<div class="table-wrap">
+    <table>
+        <thead>
+            <tr>
+                <th>User</th>
+                <th>Desktop Container</th>
+                <th>Desktop Status</th>
+                <th>Desktop IP</th>
+                <th>Mobile Container</th>
+                <th>Mobile Status</th>
+                <th>Mobile IP</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for u in users %}
+            <tr>
+                <td>User {{ u.user_num }}</td>
+                <td>{{ u.vnc_container }}</td>
+                <td><span class="badge badge-{{ 'running' if statuses.get(u.vnc_container) == 'running' else 'stopped' }}">{{ statuses.get(u.vnc_container, 'unknown') }}</span></td>
+                <td>{{ u.vnc_ip }}</td>
+                <td>{{ u.mvnc_container }}</td>
+                <td><span class="badge badge-{{ 'running' if statuses.get(u.mvnc_container) == 'running' else 'stopped' }}">{{ statuses.get(u.mvnc_container, 'unknown') }}</span></td>
+                <td>{{ u.mvnc_ip }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

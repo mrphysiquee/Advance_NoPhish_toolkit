@@ -91,6 +91,12 @@ const UI = {
         if (isTouchDevice) {
             // Remove the address bar
             setTimeout(() => window.scrollTo(0, 1), 100);
+            
+            // Set default scaling mode for mobile
+            UI.setDefaultScalingMode();
+            
+            // Enhanced mobile setup
+            UI.setupMobileOptimizations();
         }
 
         // Restore control bar position
@@ -113,8 +119,6 @@ const UI = {
 
         // Bootstrap fallback input handler
         UI.keyboardinputReset();
-
-        UI.openControlbar();
 
         UI.updateVisualState('init');
 
@@ -439,8 +443,7 @@ const UI = {
             UI.disableSetting('path');
             UI.disableSetting('repeaterID');
 
-            // Hide the controlbar after 2 seconds
-            UI.closeControlbarTimeout = setTimeout(UI.closeControlbar, 2000);
+            // Controlbar hidden — no timeout needed
         } else {
             UI.enableSetting('encrypt');
             UI.enableSetting('shared');
@@ -1111,7 +1114,6 @@ const UI = {
         } else {
             msg = _("Connected (unencrypted) to ") + UI.desktopName;
         }
-        UI.showStatus(msg);
         UI.updateVisualState('connected');
 
         // Do this last because it can only be used on rendered elements
@@ -1436,15 +1438,28 @@ const UI = {
 
         if (document.activeElement == input) return;
 
+        // Enhanced mobile keyboard handling
+        input.style.opacity = '1';
+        input.style.pointerEvents = 'auto';
         input.focus();
 
-        try {
-            const l = input.value.length;
-            // Move the caret to the end
-            input.setSelectionRange(l, l);
-        } catch (err) {
-            // setSelectionRange is undefined in Google Chrome
-        }
+        // Force keyboard to appear on mobile
+        setTimeout(() => {
+            input.focus();
+            try {
+                const l = input.value.length;
+                // Move the caret to the end
+                input.setSelectionRange(l, l);
+            } catch (err) {
+                // setSelectionRange is undefined in Google Chrome
+            }
+        }, 100);
+
+        // Prevent scrolling when keyboard is shown
+        document.body.style.overflow = 'hidden';
+        document.body.style.position = 'fixed';
+        document.body.style.width = '100%';
+        document.body.style.height = '100%';
     },
 
     hideVirtualKeyboard() {
@@ -1454,7 +1469,16 @@ const UI = {
 
         if (document.activeElement != input) return;
 
+        // Enhanced mobile keyboard hiding
+        input.style.opacity = '0';
+        input.style.pointerEvents = 'none';
         input.blur();
+
+        // Restore scrolling
+        document.body.style.overflow = '';
+        document.body.style.position = '';
+        document.body.style.width = '';
+        document.body.style.height = '';
     },
 
     toggleVirtualKeyboard() {
@@ -1760,6 +1784,54 @@ const UI = {
  *    /MISC
  * ==============
  */
+};
+
+// Mobile-specific functions
+UI.setDefaultScalingMode = function() {
+    // Set default scaling mode for mobile devices
+    const resizeSetting = WebUtil.readSetting('resize', 'scale');
+    if (isTouchDevice && resizeSetting === 'off') {
+        UI.setSetting('resize', 'scale');
+        const resizeCtrl = document.getElementById('noVNC_setting_resize');
+        if (resizeCtrl) {
+            resizeCtrl.value = 'scale';
+        }
+    }
+};
+
+UI.setupMobileOptimizations = function() {
+    // Prevent zoom on mobile devices
+    const viewport = document.querySelector('meta[name="viewport"]');
+    if (viewport) {
+        viewport.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover');
+    }
+    
+    // Enhanced touch handling for login fields
+    const inputs = document.querySelectorAll('input[type="text"], input[type="password"], input[type="email"], input[type="number"], textarea');
+    inputs.forEach(input => {
+        input.addEventListener('focus', UI.onfocusVirtualKeyboard);
+        input.addEventListener('blur', UI.onblurVirtualKeyboard);
+    });
+    
+    // Prevent double-tap zoom on mobile
+    let lastTouchEnd = 0;
+    document.addEventListener('touchend', function(event) {
+        const now = Date.now();
+        if (now - lastTouchEnd <= 300) {
+            event.preventDefault();
+        }
+        lastTouchEnd = now;
+    }, false);
+    
+    // Hide control bar on mobile after inactivity
+    if (isTouchDevice) {
+        setTimeout(() => {
+            const controlBar = document.getElementById('noVNC_control_bar_anchor');
+            if (controlBar && controlBar.classList.contains('noVNC_open')) {
+                controlBar.classList.remove('noVNC_open');
+            }
+        }, 5000);
+    }
 };
 
 // Set up translations

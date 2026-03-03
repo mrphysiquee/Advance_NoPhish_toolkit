@@ -1,0 +1,103 @@
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: nophish-postgres
+    environment:
+      POSTGRES_DB: nophish
+      POSTGRES_USER: nophish_user
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nophish_user -d nophish"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # Redis for caching and session management
+  redis:
+    image: redis:7-alpine
+    container_name: nophish-redis
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # FastAPI Backend
+  backend:
+    build:
+      context: .
+      dockerfile: backend-api.Dockerfile
+    container_name: nophish-backend
+    environment:
+      - DATABASE_URL=postgresql://nophish_user:${POSTGRES_PASSWORD}@postgres:5432/nophish
+      - REDIS_URL=redis://redis:6379
+      - SECRET_KEY=${SECRET_KEY}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - CORS_ORIGINS=["https://account-login.help", "http://localhost:3000"]
+    volumes:
+      - ./logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "8000:5000"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # React Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: nophish-frontend
+    ports:
+      - "8080:80"
+    volumes:
+      - ./certbot-www:/var/www/certbot
+      - ./ssl:/etc/letsencrypt
+    depends_on:
+      - backend
+    restart: unless-stopped
+    environment:
+      - PANEL_DOMAIN=account-login.help
+    networks:
+      - default
+
+  # Certbot for SSL certificates
+  certbot:
+    image: certbot/certbot:latest
+    container_name: nophish-certbot
+    volumes:
+      - ./certbot-www:/var/www/certbot
+      - ./ssl:/etc/letsencrypt
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
+    depends_on:
+      - frontend
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  default:
+    driver: bridge

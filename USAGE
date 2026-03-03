@@ -1,0 +1,48 @@
+  cd /root/NoPhish
+  ./setup.sh install
+
+  2. Run with your current config (SSL + Google target):
+  cd /root/NoPhish
+  ./run.sh
+
+  Which executes:
+  ./setup.sh -u 1 -d account-login.help -t https://accounts.google.com -s true \
+    -c /etc/letsencrypt/live/account-login.help/fullchain.pem \
+    -k /etc/letsencrypt/live/account-login.help/privkey.pem
+
+  3. General usage:
+  ./setup.sh -u <users> -d <domain> -t <target> [options]
+  ┌──────┬───────────────────────────────────────────────────┐
+  │ Flag │                    Description                    │
+  ├──────┼───────────────────────────────────────────────────┤
+  │ -u   │ Number of users (1 container pair per user)       │
+  ├──────┼───────────────────────────────────────────────────┤
+  │ -d   │ Your phishing domain                              │
+  ├──────┼───────────────────────────────────────────────────┤
+  │ -t   │ Target website (e.g. https://accounts.google.com) │
+  ├──────┼───────────────────────────────────────────────────┤
+  │ -s   │ true to enable SSL                                │
+  ├──────┼───────────────────────────────────────────────────┤
+  │ -c   │ Path to SSL certificate (.pem)                    │
+  ├──────┼───────────────────────────────────────────────────┤
+  │ -k   │ Path to SSL private key                           │
+  ├──────┼───────────────────────────────────────────────────┤
+  │ -e   │ simple for JSON cookie export                     │
+  ├──────┼───────────────────────────────────────────────────┤
+  │ -a   │ Custom user agent string                          │
+  ├──────┼───────────────────────────────────────────────────┤
+  │ -z   │ true/false compress profile to zip                │
+  ├──────┼───────────────────────────────────────────────────┤
+  │ -p   │ Custom URL parameters                             │
+  ├──────┼───────────────────────────────────────────────────┤
+  │ -r   │ true to redirect to target after disconnect       │
+  └──────┴───────────────────────────────────────────────────┘
+  4. Stop (Ctrl+C while running, or manual):
+  sudo docker rm -f $(sudo docker ps --filter=name="vnc-*" -q)
+  sudo docker rm -f $(sudo docker ps --filter=name="rev-proxy" -q)
+
+  5. Full cleanup (removes images too):
+  ./setup.sh cleanup
+
+  Example - 4 users, no SSL:
+  ./setup.sh -u 4 -t https://accounts.google.com -d hello.local

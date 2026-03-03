@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Control Panel{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/panel.css') }}">
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    {% if current_user.is_authenticated %}
+    <div class="layout">
+        <nav class="sidebar">
+            <div class="sidebar-header">
+                <h2>Panel</h2>
+            </div>
+            <ul class="nav-links">
+                <li><a href="{{ url_for('campaigns.dashboard') }}" class="{% if request.endpoint == 'campaigns.dashboard' %}active{% endif %}">Dashboard</a></li>
+                <li><a href="{{ url_for('campaigns.list_campaigns') }}" class="{% if 'campaigns' in request.endpoint and request.endpoint != 'campaigns.dashboard' %}active{% endif %}">Campaigns</a></li>
+                <li><a href="{{ url_for('domains.list_domains') }}" class="{% if 'domains' in request.endpoint %}active{% endif %}">Domains</a></li>
+            </ul>
+            <div class="sidebar-footer">
+                <a href="{{ url_for('auth.logout') }}">Logout</a>
+            </div>
+        </nav>
+        <main class="content">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+            <div class="flash-messages">
+                {% for category, message in messages %}
+                <div class="flash flash-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            </div>
+            {% endif %}
+            {% endwith %}
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+    {% else %}
+    {% block unauthenticated %}{% endblock %}
+    {% endif %}
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

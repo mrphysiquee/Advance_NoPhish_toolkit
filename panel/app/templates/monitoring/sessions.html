@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+{% block title %}Sessions - {{ campaign.name }}{% endblock %}
+{% block content %}
+<style>
+.browser-filter {
+    margin-bottom: 20px;
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 5px;
+    border: 1px solid #dee2e6;
+}
+
+.browser-filter label {
+    margin-right: 10px;
+    font-weight: 500;
+}
+
+.browser-filter select {
+    margin-right: 20px;
+    padding: 5px 10px;
+    border: 1px solid #ced4da;
+    border-radius: 3px;
+}
+
+.campaign-info {
+    margin-left: 20px;
+    color: #6c757d;
+}
+
+.campaign-info strong {
+    color: #495057;
+}
+
+#sessions-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+}
+
+#sessions-table th,
+#sessions-table td {
+    padding: 12px;
+    text-align: left;
+    border-bottom: 1px solid #dee2e6;
+}
+
+#sessions-table th {
+    background-color: #f8f9fa;
+    font-weight: 600;
+    color: #495057;
+}
+
+#sessions-table tr:hover {
+    background-color: #f8f9fa;
+}
+
+#sessions-table .truncate {
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 40px;
+    color: #6c757d;
+    font-style: italic;
+}
+</style>
+
+<div class="page-header">
+    <h1>Sessions - {{ campaign.name }}</h1>
+    <a href="{{ url_for('campaigns.detail', campaign_id=campaign.id) }}" class="btn">Back to Campaign</a>
+</div>
+
+<div class="table-wrap">
+    <div class="browser-filter">
+        <label for="browser_filter">Filter by Browser:</label>
+        <select id="browser_filter" onchange="filterSessions()">
+            <option value="">All Browsers</option>
+            <option value="chrome">Chrome / Chromium</option>
+            <option value="firefox">Firefox</option>
+        </select>
+        <span class="campaign-info">
+            Campaign Browser: <strong>{{ campaign.browser|title }}</strong>
+        </span>
+    </div>
+
+    <table id="sessions-table">
+        <thead>
+            <tr>
+                <th>Browser</th>
+                <th>Source</th>
+                <th>Name</th>
+                <th>Value</th>
+                <th>Host</th>
+                <th>Path</th>
+                <th>Secure</th>
+                <th>HttpOnly</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for c in cookies %}
+            <tr data-browser="{{ c.browser|default('unknown') }}">
+                <td>{{ c.browser|title|default('Unknown') }}</td>
+                <td>{{ c.phis }}</td>
+                <td>{{ c.name }}</td>
+                <td class="truncate">{{ c.value }}</td>
+                <td>{{ c.host }}</td>
+                <td>{{ c.path }}</td>
+                <td>{{ c.isSecure }}</td>
+                <td>{{ c.isHttpOnly }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="8" class="empty-state">No session data collected yet.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <script>
+    function filterSessions() {
+        const filterValue = document.getElementById('browser_filter').value;
+        const rows = document.querySelectorAll('#sessions-table tbody tr');
+        
+        rows.forEach(row => {
+            const browser = row.getAttribute('data-browser');
+            if (filterValue === '' || browser === filterValue) {
+                row.style.display = '';
+            } else {
+                row.style.display = 'none';
+            }
+        });
+        
+        // Update empty state message
+        const visibleRows = Array.from(rows).filter(row => row.style.display !== 'none');
+        const emptyState = document.querySelector('.empty-state');
+        
+        if (visibleRows.length === 0 && cookies.length > 0) {
+            emptyState.textContent = `No session data found for ${filterValue || 'selected browser'}.`;
+        } else if (cookies.length === 0) {
+            emptyState.textContent = 'No session data collected yet.';
+        }
+    }
+    
+    // Auto-filter by campaign browser
+    document.addEventListener('DOMContentLoaded', function() {
+        const campaignBrowser = '{{ campaign.browser }}';
+        if (campaignBrowser) {
+            document.getElementById('browser_filter').value = campaignBrowser;
+            filterSessions();
+        }
+    });
+    </script>
+</div>
+{% endblock %}

@@ -15,10 +15,186 @@
     -->
     <title>Connecting...</title>
     <link rel="icon" type="image/x-icon" href="app/images/icons/novnc.ico">
-    <!-- Apple iOS Safari settings -->
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Enhanced mobile viewport settings for perfect iOS/Android scaling -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="format-detection" content="telephone=no">
+    <meta name="theme-color" content="#000000">
+    
+    <!-- Mobile-specific CSS for better keyboard and scaling -->
+    <style>
+        * {
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+        input, textarea {
+            -webkit-user-select: text;
+            user-select: text;
+        }
+        body {
+            overflow: hidden;
+            position: fixed;
+            width: 100%;
+            height: 100%;
+            background: #000;
+        }
+        #noVNC_container {
+            touch-action: none;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+
+        /*
+         * noVNC keyboard relay textarea — must be INVISIBLE but focusable.
+         * Focusing this element triggers the native OS keyboard on iOS/Android,
+         * and noVNC's internal handlers then forward all keystrokes to VNC.
+         * font-size:16px is critical — prevents iOS from zooming the page on focus.
+         */
+        #noVNC_keyboardinput {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 1px;
+            height: 1px;
+            opacity: 0;
+            border: none;
+            outline: none;
+            padding: 0;
+            margin: 0;
+            font-size: 16px;
+            background: transparent;
+            color: transparent;
+            caret-color: transparent;
+            resize: none;
+            pointer-events: none;
+            z-index: -1;
+            overflow: hidden;
+        }
+
+        /* Floating keyboard trigger button */
+        #noph_kbd_btn {
+            position: fixed;
+            bottom: 16px;
+            right: 16px;
+            width: 52px;
+            height: 52px;
+            border-radius: 50%;
+            background: rgba(20, 20, 20, 0.72);
+            border: 1.5px solid rgba(255, 255, 255, 0.18);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9998;
+            cursor: pointer;
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+            box-shadow: 0 2px 14px rgba(0, 0, 0, 0.45);
+            padding: 0;
+            transition: background 0.15s;
+        }
+        #noph_kbd_btn:active {
+            background: rgba(60, 60, 60, 0.85);
+        }
+        #noph_kbd_btn.active {
+            background: rgba(0, 120, 255, 0.75);
+        }
+
+        /* ── AnySoftKeyboard-style virtual keyboard ── */
+        #ask_keyboard {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: #1b1b1f;
+            border-top: 1px solid #3a3a44;
+            z-index: 9999;
+            padding: 4px 3px 8px;
+            padding-bottom: max(8px, env(safe-area-inset-bottom));
+            box-shadow: 0 -6px 28px rgba(0,0,0,0.75);
+            display: none;
+            transform: translateY(100%);
+            transition: transform 0.18s cubic-bezier(.25,.46,.45,.94);
+            touch-action: manipulation;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
+        }
+        #ask_keyboard.visible { transform: translateY(0); }
+        .ask-row {
+            display: flex;
+            justify-content: center;
+            align-items: stretch;
+            gap: 4px;
+            margin-bottom: 4px;
+        }
+        .ask-row:last-child { margin-bottom: 0; }
+        .ask-key {
+            flex: 1;
+            min-width: 0;
+            background: #2e2e36;
+            color: #f0f0f0;
+            border: none;
+            border-radius: 6px;
+            height: clamp(38px, 10.5vw, 52px);
+            font-size: clamp(14px, 3.8vw, 22px);
+            font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+            font-weight: 400;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            -webkit-tap-highlight-color: transparent;
+            box-shadow: 0 2px 0 rgba(0,0,0,0.5);
+            padding: 0;
+            outline: none;
+            touch-action: manipulation;
+            pointer-events: auto;
+        }
+        .ask-key:active, .ask-key.pressed {
+            background: #55555f;
+            box-shadow: none;
+            transform: translateY(1px);
+        }
+        .ask-key.fn {
+            flex: 1.5;
+            background: #3a3a44;
+            color: #bbb;
+            font-size: clamp(11px, 3vw, 17px);
+        }
+        .ask-key.fn:active, .ask-key.fn.pressed { background: #55555f; }
+        .ask-key.grow {
+            flex: 4;
+            background: #2e2e36;
+            color: #888;
+            font-size: clamp(9px, 2.5vw, 13px);
+            letter-spacing: 1px;
+        }
+        .ask-key.shift-on  { background: #1a6bb5 !important; color: #fff; }
+        .ask-key.shift-caps{ background: #1a8a3f !important; color: #fff; }
+
+        /* Mobile button enhancements */
+        .noVNC_button {
+            min-height: 44px;
+            min-width: 44px;
+            padding: 10px;
+        }
+        /* Hide scrollbars on mobile */
+        ::-webkit-scrollbar { display: none; }
+
+        /* Full screen canvas */
+        #noVNC_canvas {
+            width: 100vw !important;
+            height: 100vh !important;
+            object-fit: contain;
+        }
+    </style>
     
     <!-- @2x -->
     <link rel="apple-touch-icon" sizes="40x40" type="image/png" href="app/images/icons/novnc-ios-40.png">
@@ -36,28 +212,6 @@
     <!-- Stylesheets -->
     <link rel="stylesheet" href="app/styles/base.css">
     <link rel="stylesheet" href="app/styles/input.css">
-    <style>
-	#keyboard {
-	    position: fixed;
-	    bottom: 20px; /* 20px from the bottom of the screen */
-	    right: 20px;  /* 20px from the right of the screen */
-	    z-index: 1000; /* Ensure it appears above other content */
-	}
-
-	/* Style the input (the image button) to make it circular */
-	#noVNC_keyboard_button {
-	    border-radius: 25%; /* Makes it circular */
-	    border: 2px solid black; /* Adds a black border around the button */
-	    cursor: pointer; /* Change cursor to pointer to indicate it's clickable */
-	    background-color: white;
-	    /* transition: transform 0.4s ease, bottom 0.4s ease; /* Smooth transition for scaling and positioning */
-	}
-
-	/* Hover effect to enlarge the button */
-	#noVNC_keyboard_button:hover {
-	    transform: scale(1.1); /* Slightly enlarge the button on hover */
-	}
-    </style>
 
     <!-- Images that will later appear via CSS -->
     <link rel="preload" as="image" href="app/images/info.svg">
@@ -79,9 +233,6 @@
     </div>
     
     
-    <div id="keyboard">
-        <input type="image" alt="Keyboard" id="noVNC_keyboard_button" class="noVNC_button" title="Show Keyboard" src="app/images/keyboard.svg" width="45" height="40">
-    </div>
     <!-- noVNC Control Bar -->
     <div id="noVNC_control_bar_anchor" style="display:none">
 
@@ -361,5 +512,349 @@
         <source src="app/sounds/bell.oga" type="audio/ogg">
         <source src="app/sounds/bell.mp3" type="audio/mpeg">
     </audio>
+
+    <!-- Floating keyboard toggle button -->
+    <button id="noph_kbd_btn" type="button" aria-label="Toggle keyboard">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none"
+             stroke="rgba(255,255,255,0.88)" stroke-width="1.8"
+             stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="6" width="20" height="13" rx="2"/>
+            <line x1="6"  y1="10" x2="6"  y2="10"/>
+            <line x1="10" y1="10" x2="10" y2="10"/>
+            <line x1="14" y1="10" x2="14" y2="10"/>
+            <line x1="18" y1="10" x2="18" y2="10"/>
+            <line x1="6"  y1="14" x2="6"  y2="14"/>
+            <line x1="10" y1="14" x2="10" y2="14"/>
+            <line x1="14" y1="14" x2="14" y2="14"/>
+            <line x1="18" y1="14" x2="18" y2="14"/>
+            <line x1="8"  y1="17" x2="16" y2="17"/>
+        </svg>
+    </button>
+
+    <!-- AnySoftKeyboard-style virtual keyboard overlay -->
+    <div id="ask_keyboard" aria-label="Virtual Keyboard" role="group"></div>
+
+    <script>
+    (function () {
+        'use strict';
+
+        // ── Layout tables (from AnySoftKeyboard qwerty.xml) ─────────────────
+        // Each key: [label, value, extraClass?]
+        // Special values: SHIFT BACKSPACE ENTER SPACE SYM ABC
+        var ALPHA = [
+            // Row 1 – q…p
+            [['q','q'],['w','w'],['e','e'],['r','r'],['t','t'],
+             ['y','y'],['u','u'],['i','i'],['o','o'],['p','p']],
+            // Row 2 – a…l  (5% side padding applied via row style)
+            [['a','a'],['s','s'],['d','d'],['f','f'],['g','g'],
+             ['h','h'],['j','j'],['k','k'],['l','l']],
+            // Row 3 – Shift + z…m + Backspace
+            [['⇧','SHIFT','fn'],['z','z'],['x','x'],['c','c'],['v','v'],
+             ['b','b'],['n','n'],['m','m'],['⌫','BACKSPACE','fn']],
+            // Row 4 – mode / space / enter
+            [['?123','SYM','fn'],['·  ·','SPACE','grow'],['↵','ENTER','fn']]
+        ];
+
+        var SYM = [
+            // Row 1
+            [['1','1'],['2','2'],['3','3'],['4','4'],['5','5'],
+             ['6','6'],['7','7'],['8','8'],['9','9'],['0','0']],
+            // Row 2
+            [['@','@'],['#','#'],['$','$'],['%','%'],['&','&'],
+             ['-','-'],['+','+'],['(','('],[')',')'],["'","'"]],
+            // Row 3
+            [['=\\<','SYM2','fn'],['!','!'],['?','?'],[',',','],
+             ['.','.'],['/','/'],['_','_'],['\"','"'],['⌫','BACKSPACE','fn']],
+            // Row 4
+            [['ABC','ABC','fn'],['·  ·','SPACE','grow'],['↵','ENTER','fn']]
+        ];
+
+        var SYM2 = [
+            // Row 1
+            [['~','~'],['`','`'],['|','|'],['·','·'],['…','…'],
+             ['^','^'],['<','<'],['>','>'],['=','='],['\\','\\']],
+            // Row 2
+            [['{','{'],['}','}'],['[','['],[ ']',']'],['(','('],
+             [')',')'],['€','€'],['£','£'],['¥','¥'],['°','°']],
+            // Row 3
+            [['?123','SYM','fn'],['©','©'],['®','®'],['™','™'],['«','«'],
+             ['»','»'],['×','×'],['÷','÷'],['⌫','BACKSPACE','fn']],
+            // Row 4
+            [['ABC','ABC','fn'],['·  ·','SPACE','grow'],['↵','ENTER','fn']]
+        ];
+
+        // ── State ────────────────────────────────────────────────────────────
+        var shiftState = 0;   // 0=off 1=one-shot 2=caps-lock
+        var kbdMode   = 'alpha'; // 'alpha' | 'sym' | 'sym2'
+        var kbdVisible = false;
+        var bsTimer   = null;
+        var hoveredOnce = false;
+
+        // ── noVNC relay ──────────────────────────────────────────────────────
+        function relay() { return document.getElementById('noVNC_keyboardinput'); }
+
+        function focusRelay() {
+            var ta = relay();
+            if (ta && document.activeElement !== ta) ta.focus();
+        }
+
+        function sendChar(ch) {
+            var ta = relay();
+            if (!ta) return;
+            focusRelay();
+            ta.value += ch;
+            ta.dispatchEvent(new InputEvent('input', {
+                bubbles: true, cancelable: true,
+                data: ch, inputType: 'insertText'
+            }));
+        }
+
+        function sendBackspace() {
+            var ta = relay();
+            if (!ta) return;
+            focusRelay();
+            if (ta.value.length > 1) {
+                ta.value = ta.value.slice(0, -1);
+                ta.dispatchEvent(new InputEvent('input', {
+                    bubbles: true, cancelable: true,
+                    inputType: 'deleteContentBackward'
+                }));
+            } else {
+                // Fallback: raw keydown when textarea nearly empty
+                ta.dispatchEvent(new KeyboardEvent('keydown', {
+                    key:'Backspace', code:'Backspace', keyCode:8, bubbles:true
+                }));
+                ta.dispatchEvent(new KeyboardEvent('keyup', {
+                    key:'Backspace', code:'Backspace', keyCode:8, bubbles:true
+                }));
+            }
+        }
+
+        function sendEnter() {
+            var ta = relay();
+            if (!ta) return;
+            focusRelay();
+            ta.dispatchEvent(new KeyboardEvent('keydown', {
+                key:'Enter', code:'Enter', keyCode:13, bubbles:true
+            }));
+            ta.dispatchEvent(new KeyboardEvent('keyup', {
+                key:'Enter', code:'Enter', keyCode:13, bubbles:true
+            }));
+        }
+
+        // ── Key dispatch ─────────────────────────────────────────────────────
+        function dispatchKey(value) {
+            if (value === 'BACKSPACE') { sendBackspace(); return; }
+            if (value === 'ENTER')     { sendEnter();     return; }
+            if (value === 'SPACE')     { sendChar(' ');   return; }
+
+            if (value === 'SHIFT') {
+                shiftState = (shiftState + 1) % 3;
+                refreshShiftVisual();
+                return;
+            }
+            if (value === 'SYM')  { kbdMode = (kbdMode === 'alpha') ? 'sym' : (kbdMode === 'sym' ? 'alpha' : 'sym'); buildKeyboard(); return; }
+            if (value === 'SYM2') { kbdMode = 'sym2'; buildKeyboard(); return; }
+            if (value === 'ABC')  { kbdMode = 'alpha'; shiftState = 0; buildKeyboard(); return; }
+
+            // Printable character
+            var ch = value;
+            if (shiftState > 0 && ch.length === 1 && ch >= 'a' && ch <= 'z') {
+                ch = ch.toUpperCase();
+            }
+            sendChar(ch);
+
+            // One-shot shift: reset after one character
+            if (shiftState === 1) { shiftState = 0; refreshShiftVisual(); }
+        }
+
+        // ── Update shift appearance without full rebuild ──────────────────────
+        function refreshShiftVisual() {
+            var shiftKeys = document.querySelectorAll('#ask_keyboard .ask-key[data-val="SHIFT"]');
+            shiftKeys.forEach(function(el) {
+                el.classList.toggle('shift-on',   shiftState === 1);
+                el.classList.toggle('shift-caps', shiftState === 2);
+            });
+            // Update letter labels
+            document.querySelectorAll('#ask_keyboard .ask-key[data-alpha]').forEach(function(el) {
+                var v = el.dataset.alpha;
+                el.textContent = shiftState > 0 ? v.toUpperCase() : v;
+            });
+        }
+
+        // ── Build keyboard DOM ───────────────────────────────────────────────
+        function currentRows() {
+            if (kbdMode === 'sym')  return SYM;
+            if (kbdMode === 'sym2') return SYM2;
+            return ALPHA;
+        }
+
+        function buildKeyboard() {
+            var kbdEl = document.getElementById('ask_keyboard');
+            kbdEl.innerHTML = '';
+
+            var rows = currentRows();
+            rows.forEach(function(rowKeys, ri) {
+                var rowEl = document.createElement('div');
+                rowEl.className = 'ask-row';
+
+                // Row 2 of alpha: indent 5% each side so 9 keys centre like ASK
+                if (kbdMode === 'alpha' && ri === 1) {
+                    rowEl.style.paddingLeft  = '5%';
+                    rowEl.style.paddingRight = '5%';
+                }
+
+                rowKeys.forEach(function(kd) {
+                    var label = kd[0], val = kd[1], extra = kd[2] || '';
+                    var btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.className = 'ask-key' + (extra ? ' ' + extra : '');
+                    btn.dataset.val = val;
+
+                    // Mark alpha letters so shift visual can update them
+                    if (val.length === 1 && val >= 'a' && val <= 'z') {
+                        btn.dataset.alpha = val;
+                        btn.textContent = shiftState > 0 ? val.toUpperCase() : val;
+                    } else {
+                        btn.textContent = label;
+                    }
+
+                    if (val === 'SHIFT') {
+                        if (shiftState === 1) btn.classList.add('shift-on');
+                        if (shiftState === 2) btn.classList.add('shift-caps');
+                    }
+
+                    // Touch events (primary for mobile)
+                    btn.addEventListener('touchstart', onKeyTouchStart, {passive:false});
+                    btn.addEventListener('touchend',   onKeyTouchEnd,   {passive:false});
+                    btn.addEventListener('touchcancel',onKeyTouchEnd,   {passive:false});
+
+                    // Mouse events (desktop preview / admin panel)
+                    btn.addEventListener('mousedown', onKeyMouseDown);
+                    btn.addEventListener('mouseup',   onKeyMouseUp);
+                    btn.addEventListener('mouseleave',onKeyMouseUp);
+
+                    rowEl.appendChild(btn);
+                });
+
+                kbdEl.appendChild(rowEl);
+            });
+        }
+
+        // ── Touch / mouse handlers ───────────────────────────────────────────
+        function startBackspaceRepeat() {
+            if (bsTimer) return;
+            bsTimer = setInterval(sendBackspace, 80);
+        }
+        function stopBackspaceRepeat() {
+            if (bsTimer) { clearInterval(bsTimer); bsTimer = null; }
+        }
+
+        function onKeyTouchStart(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            var btn = e.currentTarget;
+            btn.classList.add('pressed');
+            if (btn.dataset.val === 'BACKSPACE') {
+                sendBackspace();
+                startBackspaceRepeat();
+            }
+        }
+        function onKeyTouchEnd(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            stopBackspaceRepeat();
+            var btn = e.currentTarget;
+            btn.classList.remove('pressed');
+            if (btn.dataset.val !== 'BACKSPACE') {
+                dispatchKey(btn.dataset.val);
+            }
+            focusRelay();
+        }
+        function onKeyMouseDown(e) {
+            e.preventDefault();
+            var btn = e.currentTarget;
+            btn.classList.add('pressed');
+            if (btn.dataset.val === 'BACKSPACE') {
+                sendBackspace();
+                startBackspaceRepeat();
+            }
+        }
+        function onKeyMouseUp(e) {
+            e.preventDefault();
+            stopBackspaceRepeat();
+            var btn = e.currentTarget;
+            btn.classList.remove('pressed');
+        }
+
+        // ── Show / hide ──────────────────────────────────────────────────────
+        function showKeyboard() {
+            if (kbdVisible) return;
+            kbdVisible = true;
+            buildKeyboard();
+            var kbdEl = document.getElementById('ask_keyboard');
+            kbdEl.style.display = 'block';
+            requestAnimationFrame(function() { kbdEl.classList.add('visible'); });
+            document.getElementById('noph_kbd_btn').classList.add('active');
+            setTimeout(focusRelay, 60);
+        }
+
+        function hideKeyboard() {
+            if (!kbdVisible) return;
+            kbdVisible = false;
+            var kbdEl = document.getElementById('ask_keyboard');
+            kbdEl.classList.remove('visible');
+            document.getElementById('noph_kbd_btn').classList.remove('active');
+            setTimeout(function() { if (!kbdVisible) kbdEl.style.display = 'none'; }, 200);
+        }
+
+        function toggleKeyboard() {
+            if (kbdVisible) hideKeyboard(); else showKeyboard();
+        }
+
+        // ── Initialise ───────────────────────────────────────────────────────
+        function init() {
+            // Floating button
+            var btn = document.getElementById('noph_kbd_btn');
+            btn.addEventListener('touchend', function(e) {
+                e.preventDefault(); e.stopPropagation(); toggleKeyboard();
+            }, {passive:false});
+            btn.addEventListener('click', function(e) {
+                e.stopPropagation(); toggleKeyboard();
+            });
+
+            // Auto-show on first touch of VNC canvas (mobile)
+            var container = document.getElementById('noVNC_container');
+            if (container) {
+                container.addEventListener('touchstart', function(e) {
+                    if (!e.target.closest('#ask_keyboard') &&
+                        !e.target.closest('#noph_kbd_btn')) {
+                        showKeyboard();
+                    }
+                }, {passive:true});
+
+                // Auto-show on first hover (desktop admin preview)
+                container.addEventListener('mouseenter', function() {
+                    if (!hoveredOnce) { hoveredOnce = true; showKeyboard(); }
+                });
+            }
+
+            // Hide when tapping outside keyboard + button
+            document.addEventListener('touchstart', function(e) {
+                if (kbdVisible &&
+                    !e.target.closest('#ask_keyboard') &&
+                    !e.target.closest('#noph_kbd_btn')) {
+                    hideKeyboard();
+                }
+            }, {passive:true});
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', init);
+        } else {
+            init();
+        }
+    })();
+    </script>
  </body>
 </html>

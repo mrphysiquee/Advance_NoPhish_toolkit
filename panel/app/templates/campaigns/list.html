@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Campaigns - Panel{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>Campaigns</h1>
+    <a href="{{ url_for('campaigns.create') }}" class="btn btn-primary">New Campaign</a>
+</div>
+
+<div class="table-wrap">
+    <table>
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Domain</th>
+                <th>Target</th>
+                <th>Users</th>
+                <th>SSL</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for c in campaigns %}
+            <tr>
+                <td><a href="{{ url_for('campaigns.detail', campaign_id=c.id) }}">{{ c.name }}</a></td>
+                <td>{{ c.domain }}</td>
+                <td class="truncate">{{ c.target }}</td>
+                <td>{{ c.num_users }}</td>
+                <td>{{ 'Yes' if c.ssl else 'No' }}</td>
+                <td><span class="badge badge-{{ c.status }}">{{ c.status }}</span></td>
+                <td class="actions">
+                    <a href="{{ url_for('campaigns.detail', campaign_id=c.id) }}" class="btn btn-sm">View</a>
+                    {% if c.status == 'created' %}
+                    <form method="POST" action="{{ url_for('campaigns.launch', campaign_id=c.id) }}" style="display:inline">
+                        <button type="submit" class="btn btn-sm btn-primary">Launch</button>
+                    </form>
+                    {% elif c.status == 'running' %}
+                    <form method="POST" action="{{ url_for('campaigns.stop', campaign_id=c.id) }}" style="display:inline">
+                        <button type="submit" class="btn btn-sm btn-danger">Stop</button>
+                    </form>
+                    {% endif %}
+                </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="7" class="empty-state">No campaigns yet.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

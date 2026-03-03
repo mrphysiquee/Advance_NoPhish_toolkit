@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block title %}Keylogs - {{ campaign.name }}{% endblock %}
+{% block content %}
+<style>
+.browser-info {
+    margin-bottom: 20px;
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 5px;
+    border: 1px solid #dee2e6;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.keylog-entry {
+    margin-bottom: 20px;
+    padding: 15px;
+    border: 1px solid #dee2e6;
+    border-radius: 5px;
+    background: white;
+}
+
+.keylog-entry h3 {
+    margin-top: 0;
+    color: #495057;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.device-badge {
+    background: #007bff;
+    color: white;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+}
+
+.browser-badge {
+    background: #28a745;
+    color: white;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+}
+
+.keylog-entry pre {
+    background: #f8f9fa;
+    padding: 10px;
+    border-radius: 3px;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+.keylog-entry small {
+    color: #6c757d;
+    font-style: italic;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 40px;
+    color: #6c757d;
+    font-style: italic;
+}
+</style>
+
+<div class="page-header">
+    <h1>Keylogs - {{ campaign.name }}</h1>
+    <a href="{{ url_for('campaigns.detail', campaign_id=campaign.id) }}" class="btn">Back to Campaign</a>
+</div>
+
+<div class="browser-info">
+    <span><strong>Campaign Browser:</strong> {{ campaign.browser|title }}</span>
+    <span><strong>Total Entries:</strong> {{ keylogs|length }}</span>
+</div>
+
+{% for k in keylogs %}
+<div class="keylog-entry">
+    <h3>User {{ k.user_num }} {{ '(Mobile)' if k.is_mobile else '(Desktop)' }}</h3>
+    <pre>{{ k.content or 'No keylog data yet.' }}</pre>
+    {% if k.updated_at %}
+    <small>Last updated: {{ k.updated_at.strftime('%Y-%m-%d %H:%M:%S') }}</small>
+    {% endif %}
+</div>
+{% else %}
+<p class="empty-state">No keylog data collected yet.</p>
+{% endfor %}
+{% endblock %}
