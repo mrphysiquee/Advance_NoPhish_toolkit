@@ -169,7 +169,7 @@ sudo usermod -aG docker $USER
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/your-username/NoPhish.git
+git clone vhttps://github.com/mrphysiquee/Advance_NoPhish_toolkit.git
 cd NoPhish
 ```
 
